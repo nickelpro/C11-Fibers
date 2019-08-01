@@ -1,15 +1,15 @@
-cmake_minimum_required(VERSION 3.14)
+# Previous to 3.15 cmake would override the ASM_NASM_COMPILE_OBJECT
+cmake_minimum_required(VERSION 3.15)
 
 set(CMAKE_ASM_NASM_LINK_EXECUTABLE "ld <CMAKE_ASM_NASM_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
 set(CMAKE_ASM_NASM_FLAGS_DEBUG "-g -Fdwarf")
-enable_language(ASM_NASM)
 set(CMAKE_ASM_NASM_COMPILE_OBJECT "<CMAKE_ASM_NASM_COMPILER> <INCLUDES> <FLAGS> -o <OBJECT> <SOURCE>")
 add_compile_options(
     "$<$<COMPILE_LANGUAGE:ASM_NASM>:-f $<IF:$<BOOL:$<TARGET_PROPERTY:NASM_OBJ_FORMAT>>, \
     $<TARGET_PROPERTY:NASM_OBJ_FORMAT>, ${CMAKE_ASM_NASM_OBJECT_FORMAT}>>"
 )
 
-project(vgasm C)
+project(vgasm C ASM_NASM)
 
 add_executable(main
     src/main.c src/queue.c src/fiber.c
