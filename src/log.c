@@ -89,7 +89,7 @@ void log_set_simple(int enable) {
 	L.simple = enable ? 1 : 0;
 }
 
-int log_is_simple() {
+int log_is_simple(void) {
 	return L.simple;
 }
 

@@ -26,15 +26,11 @@ vgc_ringbuf vgc_ringbuf_init(
 vgc_queue vgc_queue_init(
 	void *buf,
 	size_t size,
-	pthread_mutex_t *waiter_mux,
-	pthread_cond_t *waiter_cond,
-	atomic_bool *is_waiter
+	scheduler *sched
 ) {
 	vgc_queue q;
 	q.rb = vgc_ringbuf_init(buf, size);
-	q.waiter_mux = waiter_mux;
-	q.waiter_cond = waiter_cond;
-	q.is_waiter = is_waiter;
+	q.sched = sched;
 	return q;
 }
 
@@ -96,10 +92,11 @@ int vgc_enqueue(vgc_queue *q, void *data) {
 	if(vgc_push(&q->rb, data))
 		return -1;
 
-	if(atomic_load_explicit(q->is_waiter, memory_order_relaxed)) {
-		pthread_mutex_lock(q->waiter_mux);
-		pthread_cond_broadcast(q->waiter_cond);
-		pthread_mutex_unlock(q->waiter_mux);
+	scheduler *sched = q->sched;
+	if(atomic_load_explicit(&sched->is_waiter, memory_order_relaxed)) {
+		vgc_mutex_lock(&sched->waiter_mux);
+		vgc_cond_broadcast(&sched->waiter_cond);
+		vgc_mutex_unlock(&sched->waiter_mux);
 	}
 	return 0;
 }
