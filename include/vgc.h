@@ -56,38 +56,32 @@ vgc_ringbuf vgc_ringbuf_init(
 int vgc_push(vgc_ringbuf *rb, void *data);
 int vgc_pop(vgc_ringbuf *rb, void **data);
 
-struct scheduler;
+struct vgc_scheduler;
 
 typedef struct vgc_queue {
 	vgc_ringbuf rb;
-	struct scheduler *sched;
+	struct vgc_scheduler *sched;
 } vgc_queue;
+
+typedef struct vgc_scheduler {
+	vgc_queue hi_q;
+	vgc_queue mid_q;
+	vgc_queue lo_q;
+	vgc_ringbuf free_q_pool;
+	vgc_mutex waiter_mux;
+	vgc_cond waiter_cond;
+	atomic_bool is_waiter;
+} vgc_scheduler;
 
 vgc_queue vgc_queue_init(
 	void *buf,
 	size_t size,
-	struct scheduler *sched
+	vgc_scheduler *sched
 );
 int vgc_enqueue(vgc_queue *q, void *data);
 int vgc_dequeue(vgc_queue *q, void **data);
 
-typedef struct scheduler {
-	vgc_queue hi_q;
-	vgc_queue mid_q;
-	vgc_queue lo_q;
-	vgc_ringbuf free_pool;
-	vgc_mutex waiter_mux;
-	vgc_cond waiter_cond;
-	atomic_bool is_waiter;
-} scheduler;
-
 struct fiber_data;
-
-typedef enum {
-	FIBER_LO,
-	FIBER_MID,
-	FIBER_HI
-} fiber_priority;
 
 typedef struct vgc_fiber {
 	void *data; //user data
@@ -95,13 +89,23 @@ typedef struct vgc_fiber {
 	struct fiber_data *fd;
 } vgc_fiber;
 
-typedef struct spinl_counter {
+#ifndef WAIT_FIBER_LEN
+#define WAIT_FIBER_LEN 4
+#endif
+typedef struct vgc_counter {
 	atomic_int lock;
 	int counter;
-	vgc_fiber fiber;
-} spinl_counter;
+	size_t waiters_len;
+	vgc_fiber *waiters[WAIT_FIBER_LEN];
+} vgc_counter;
 
 typedef void (*vgc_proc)(vgc_fiber fiber);
+
+typedef enum {
+	FIBER_LO,
+	FIBER_MID,
+	FIBER_HI
+} fiber_priority;
 
 typedef struct {
 	vgc_proc proc;
@@ -110,6 +114,7 @@ typedef struct {
 } vgc_job;
 
 typedef struct fiber_data {
+	int id;
 	enum {
 		FIBER_START,
 		FIBER_RESUME,
@@ -118,17 +123,14 @@ typedef struct fiber_data {
 		FIBER_DONE
 	} state;
 	fiber_priority priority;
-	scheduler *sched;
-	void *stack_orig;
-	void *stack_alligned_base;
+	vgc_scheduler *sched;
+	vgc_counter *dependency_count;
+	vgc_counter *parent_count;
 	void *stack_limit;
-	struct spinl_counter parent_counter;
-	struct spinl_counter *depend_counter;
-	vgc_job *dependencies;
-	size_t dependencies_len;
+	void *stack_base;
 } fiber_data;
 
-spinl_counter vgc_counter_init(int count, vgc_fiber fiber);
+vgc_counter vgc_counter_init(int count);
 
 vgc_fiber vgc_fiber_assign(vgc_fiber fiber, vgc_proc proc);
 vgc_fiber vgc_fiber_init(void *buf, size_t size, fiber_data *fd);
@@ -137,25 +139,26 @@ noreturn void vgc_fiber_finish(vgc_fiber fiber);
 extern void *vgc_make(void *base, void *limit, vgc_proc proc);
 extern vgc_fiber vgc_jump(vgc_fiber fiber);
 
-int vgc_counter_acq_dec_que(spinl_counter *spc);
 
+vgc_job vgc_job_init(vgc_proc proc, void *data, fiber_priority priority);
 int vgc_schedule_job(
-	scheduler *scheduler,
-	vgc_proc proc,
-	void *data,
-	fiber_priority priority,
-	spinl_counter *spc
-);
-int vgc_schedule_job2(
-	scheduler *scheduler,
+	vgc_fiber fiber,
 	vgc_job job,
-	spinl_counter *spc
+	vgc_counter *count
 );
-vgc_fiber vgc_schedule_and_wait(
+int vgc_schedule_jobs(
 	vgc_fiber fiber,
 	vgc_job *jobs,
-	size_t jobs_len
+	int len,
+	vgc_counter *count
 );
 
-void vgc_scheduler_init(scheduler *scheduler, size_t size);
-THREADFUNC_TYPE vgc_thread_func(void *p);
+vgc_fiber vgc_wait_for_counter(vgc_fiber fiber, vgc_counter *count);
+vgc_fiber vgc_wait_for_counter2(
+	vgc_fiber fiber,
+	vgc_counter *count,
+	int *err
+);
+
+void vgc_scheduler_init(vgc_scheduler *sched, size_t size, vgc_job job);
+THREADFUNC_TYPE vgc_scheduler_run(void *p);

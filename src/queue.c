@@ -26,7 +26,7 @@ vgc_ringbuf vgc_ringbuf_init(
 vgc_queue vgc_queue_init(
 	void *buf,
 	size_t size,
-	scheduler *sched
+	vgc_scheduler *sched
 ) {
 	vgc_queue q;
 	q.rb = vgc_ringbuf_init(buf, size);
@@ -92,7 +92,7 @@ int vgc_enqueue(vgc_queue *q, void *data) {
 	if(vgc_push(&q->rb, data))
 		return -1;
 
-	scheduler *sched = q->sched;
+	vgc_scheduler *sched = q->sched;
 	if(atomic_load_explicit(&sched->is_waiter, memory_order_relaxed)) {
 		vgc_mutex_lock(&sched->waiter_mux);
 		vgc_cond_broadcast(&sched->waiter_cond);

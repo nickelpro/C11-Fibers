@@ -34,60 +34,36 @@ noreturn static void fibonacci(vgc_fiber fiber) {
 	int *rounds = (int *) fiber.data;
 	int a = 0;
 	int b = 1;
-	vgc_job job = {
-		.proc = print_num,
-		.data = &a,
-		.priority = FIBER_MID
-	};
+	vgc_job job = vgc_job_init(print_num, &a, FIBER_MID);
 	printf("%lu : The first %d numbers of fibonacci are:\n", thread_id(), *rounds);
 	for(int i = 0; i < *rounds; i++) {
 		int next = a + b;
 		a = b;
 		b = next;
-		fiber = vgc_schedule_and_wait(fiber, &job, 1);
+		vgc_counter count;
+		vgc_schedule_job(fiber, job, &count);
+		fiber = vgc_wait_for_counter(fiber, &count);
 	}
 	vgc_fiber_finish(fiber);
 }
 
 noreturn static void sched_fib_and_quit(vgc_fiber fiber) {
-	vgc_job jobs[] = (vgc_job[]) {
-		{
-			.proc = fibonacci,
-			.data = fiber.data,
-			.priority = FIBER_HI
-		},
-		{
-			.proc = fibonacci,
-			.data = fiber.data,
-			.priority = FIBER_HI
-		},
-		{
-			.proc = fibonacci,
-			.data = fiber.data,
-			.priority = FIBER_HI
-		},
-		{
-			.proc = fibonacci,
-			.data = fiber.data,
-			.priority = FIBER_HI
-		},
-		{
-			.proc = fibonacci,
-			.data = fiber.data,
-			.priority = FIBER_HI
-		},
-	};
-	fiber = vgc_schedule_and_wait(fiber, jobs, 5);
+	vgc_job jobs[5];
+	for(int i = 0; i < 5; i++)
+		jobs[i] = vgc_job_init(fibonacci, fiber.data, FIBER_HI);
+	vgc_counter count;
+	vgc_schedule_jobs(fiber, jobs, 5, &count);
+	fiber = vgc_wait_for_counter(fiber, &count);
 	printf("Finished\n");
 	exit(0);
 }
 
 int main(int argc, char **argv) {
-	scheduler sched;
-	vgc_scheduler_init(&sched, 128);
-	for(int i = 0; i < 5; i++)
-		create_thread(vgc_thread_func, &sched);
 	int rounds = 10;
-	vgc_schedule_job(&sched, sched_fib_and_quit, &rounds, FIBER_HI, NULL);
-	vgc_thread_func(&sched);
+	vgc_job job = vgc_job_init(sched_fib_and_quit, &rounds, FIBER_HI);
+	vgc_scheduler sched;
+	vgc_scheduler_init(&sched, 128, job);
+	for(int i = 0; i < 5; i++)
+		create_thread(vgc_scheduler_run, &sched);
+	vgc_scheduler_run(&sched);
 }
