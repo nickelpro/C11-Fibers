@@ -8,6 +8,9 @@
 #define THREADFUNC_TYPE DWORD
 #define THREADFUNC_RET 0
 
+#ifdef noreturn
+#undef noreturn
+#endif
 #include <Windows.h>
 
 typedef CRITICAL_SECTION vgc_mutex;

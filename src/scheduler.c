@@ -37,7 +37,7 @@ void vgc_cond_broadcast(vgc_cond *cond) {
 #else
 
 void vgc_mutex_init(vgc_mutex *mutex) {
-	pthread_mutex_init(mux, NULL);
+	pthread_mutex_init(mutex, NULL);
 }
 
 void vgc_mutex_lock(vgc_mutex *mutex) {

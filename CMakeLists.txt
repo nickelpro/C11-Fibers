@@ -19,14 +19,14 @@ if(WIN32)
 else()
     set(CMAKE_ASM_NASM_LINK_EXECUTABLE "ld <CMAKE_ASM_NASM_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
     set(CMAKE_ASM_NASM_FLAGS_DEBUG "-g -Fdwarf")
-    set(CMAKE_ASM_NASM_COMPILE_OBJECT "<CMAKE_ASM_NASM_COMPILER> <INCLUDES> <FLAGS> -o <OBJECT> <SOURCE>")
-    add_compile_options(
-        "$<$<COMPILE_LANGUAGE:ASM_NASM>:-f $<IF:$<BOOL:$<TARGET_PROPERTY:NASM_OBJ_FORMAT>>, \
-        $<TARGET_PROPERTY:NASM_OBJ_FORMAT>, ${CMAKE_ASM_NASM_OBJECT_FORMAT}>>"
-    )
+    set(CMAKE_ASM_NASM_COMPILE_OBJECT "<CMAKE_ASM_NASM_COMPILER> <INCLUDES> <FLAGS> -f elf64 -o <OBJECT> <SOURCE>")
+#    add_compile_options(
+#        "$<$<COMPILE_LANGUAGE:ASM_NASM>:-f $<IF:$<BOOL:$<TARGET_PROPERTY:NASM_OBJ_FORMAT>>, \
+#        $<TARGET_PROPERTY:NASM_OBJ_FORMAT>, ${CMAKE_ASM_NASM_OBJECT_FORMAT}>>"
+#    )
     enable_language(ASM_NASM)
     target_sources(main PRIVATE src/asm/x86_64_sysv_elf_nasm.asm)
-    set_target_properties(main PROPERTIES NASM_OBJ_FORMAT elf64)
+#    set_target_properties(main PROPERTIES NASM_OBJ_FORMAT elf64)
     target_link_libraries(main pthread)
 endif()
 
